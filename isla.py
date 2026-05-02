@@ -3,11 +3,11 @@ import tkinter as tk
 from tkinter import ttk, scrolledtext
 import voice
 from openai import OpenAI
+import re
 
 
 # --- 1. 系統啟動提示 ---
 print("ai")
-
 # OpenRouter 設定
 client = OpenAI(
     base_url="https://openrouter.ai/api/v1",
@@ -77,27 +77,61 @@ def send():
         full_content = response.choices[0].message.content
         set.memory.append({"role": "assistant", "content": full_content})
         
-        # 解析情緒數據
+        # 解析情緒數據（容錯版）：不依賴固定行數
         lines = full_content.splitlines()
-        
-        # 抓取數值與標籤 (假設 AI 遵守格式)
-        try:
-            set.status["開心"] = int(lines[0].split("：")[-1].strip())
-            set.status["傷心"] = int(lines[1].split("：")[-1].strip())
-            set.status["生氣"] = int(lines[2].split("：")[-1].strip())
-            set.status["平靜"] = int(lines[3].split("：")[-1].strip())
-            emotion_cn = lines[4].split("：")[-1].strip()
-            reply = lines[6].strip() if len(lines) > 6 else full_content
-            emotion_cn = set.normalize_emotion_label(
-                emotion_cn,
-                set.status["開心"],
-                set.status["傷心"],
-                set.status["生氣"],
-                set.status["平靜"],
-            )
-        except:
+        parsed_values = {}
+        for line in lines:
+            compact = line.strip().replace(" ", "")
+            for key in ("開心", "傷心", "生氣", "平靜"):
+                if compact.startswith(f"{key}：") or compact.startswith(f"{key}:"):
+                    m = re.search(r"-?\d+", line)
+                    if m:
+                        parsed_values[key] = int(m.group())
+
+        # 若四軸完整才覆寫狀態，避免格式跑掉時把數值寫壞
+        h = set.status.get("開心", 50)
+        s = set.status.get("傷心", 10)
+        a = set.status.get("生氣", 5)
+        p = set.status.get("平靜", 35)
+        if len(parsed_values) == 4:
+            h = max(0, min(100, parsed_values["開心"]))
+            s = max(0, min(100, parsed_values["傷心"]))
+            a = max(0, min(100, parsed_values["生氣"]))
+            p = max(0, min(100, parsed_values["平靜"]))
+            set.status["開心"] = h
+            set.status["傷心"] = s
+            set.status["生氣"] = a
+            set.status["平靜"] = p
+
+        # 抓情緒標籤（允許 [開心] 這種格式）
+        emotion_cn = ""
+        for line in lines:
+            compact = line.strip().replace(" ", "")
+            if compact.startswith("情緒：") or compact.startswith("情緒:"):
+                parts = re.split(r"[：:]", line, maxsplit=1)
+                if len(parts) == 2:
+                    emotion_cn = parts[1].strip().strip("[]")
+                break
+        if not emotion_cn:
             emotion_cn = "平靜"
-            reply = full_content
+        emotion_cn = set.normalize_emotion_label(emotion_cn, h, s, a, p)
+
+        # 只顯示純對話內容：刪掉前置的情緒格式行
+        hidden_prefix = ("開心", "傷心", "生氣", "平靜", "情緒")
+        reply_lines = []
+        for line in lines:
+            compact = line.strip().replace(" ", "")
+            is_meta_line = False
+            for key in hidden_prefix:
+                if compact.startswith(f"{key}：") or compact.startswith(f"{key}:"):
+                    is_meta_line = True
+                    break
+            if not is_meta_line:
+                reply_lines.append(line)
+
+        reply = "\n".join(reply_lines).strip()
+        if not reply:
+            reply = "（她點了點頭，但沒有說出完整句子。）"
 
         # --- 情緒標籤輸出至文字檔 ---
         emotion_map = {
