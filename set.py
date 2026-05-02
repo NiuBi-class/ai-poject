@@ -1,5 +1,6 @@
 import json
 import datetime
+import re
 model = "deepseek/deepseek-v3.2"
 
 memory = []
@@ -26,6 +27,27 @@ def save_memory():
 def save_status():
     with open(r"setting\status.json", "w", encoding="utf-8") as f:
         json.dump(status, f, ensure_ascii=False, indent=2)
+
+def extract_reply_text(full_content):
+    """抽取第7行之後的正文，優先保留可說出口的台詞。"""
+    body = ""
+    if "狀態：" in full_content:
+        _, _, after_status = full_content.partition("狀態：")
+        if "\n" in after_status:
+            body = after_status.split("\n", 1)[1]
+    if not body:
+        lines = full_content.splitlines()
+        body = "\n".join(lines[6:]) if len(lines) > 6 else full_content
+
+    lines = [line.strip() for line in body.splitlines() if line.strip()]
+    if not lines:
+        return ""
+
+    # 純動作行，例如：（低頭）或 (低頭)
+    pure_action_pattern = re.compile(r"^[（(][^）)]*[）)]$")
+    spoken_lines = [line for line in lines if not pure_action_pattern.match(line)]
+
+    return "\n".join(spoken_lines if spoken_lines else lines)
 
 def compress_memory():
     global memory
@@ -125,6 +147,7 @@ def personal(isla_happiness, user_message):
         f"{current_status_desc}\n"
         f"{time_info}\n"
         "請注意：回覆時必須包含情緒數值。如果提到重要事項，請標註 [重要]。"
+        "第7行開始請務必包含至少一句可直接說出口的對話句，不能只有動作描寫。"
     )
 
     # 5. 更新對話紀錄
