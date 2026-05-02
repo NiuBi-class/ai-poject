@@ -1,0 +1,25 @@
+先去open router 裏面生成api key
+然後在isla.py裏面的第14行把" " 裏面的 你的api key 改成剛剛生成的的api key
+在set.py的檔案裏面的第44行也是在做一次、
+接著是文件夾setting 裏面的 personal.txt裏面寫上你要給ai的設定 例如：你的名字叫做千紗 是一名女性 性格溫順 今年幾歲等等（可以換行寫）
+然後是rule.txt 這個是你給他訂的規則例如你覺得他話太多你可以給他寫:每次説話不超過多少字 或是講話要不要加上動作什麽的
+然後是memory.json 裏面是你們所有的對話記錄 也就是他的記憶 每30行會濃縮成一筆重點 你可以在裏面改寫記得要先暫停
+都設定完後啓動你的isla.py就可以開始跟他對話了
+
+接著是arduino的部分
+用的是lcd st7920 首先
+GND  連到 GND
+VCC  連到 5v
+RS   連到 D10
+R/W  連到 D11
+E    連到 D13
+PSB  連到 5v
+BLA  連到 3.3V
+BLK  連到 GND
+使用方法
+先打開文件夾裏面的 sketch_may1b
+裏面的sketch_may1b.ino
+然後吧ard.py裏面的COM4改成你現在在用的端口
+在啓動
+接著啓動isla.py
+就可以跟他對話 然後熒幕會隨著改變
